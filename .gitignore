@@ -1,0 +1,18 @@
+# Ignored system files
+.DS_Store
+.vscode/
+
+# Ignored deploy script
+deploy.sh
+
+# Ignored local files
+.env
+node_modules/
+dist/
+build/
+uploads/
+logs/
+
+# Ignored legacy directories
+backend/
+cognify/

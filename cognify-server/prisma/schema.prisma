@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  password_hash String
+  name          String?
+  role          Role        @default(USER)
+  created_at    DateTime    @default(now())
+
+  workspaces    Workspace[]
+  files         File[]
+  ai_requests   AIRequest[]
+  api_keys      APIKey[]
+  subscription  Subscription?
+  teams         TeamMember[]
+  messages      Message[]
+  prompt_versions PromptVersion[]
+  workflows     Workflow[]
+  comments      Comment[]
+}
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  created_at  DateTime @default(now())
+
+  user_id String
+  user    User @relation(fields: [user_id], references: [id])
+
+  files         File[]
+  ai_requests   AIRequest[]
+  embeddings    Embedding[]
+  messages      Message[]
+  team_workspaces TeamWorkspace[]
+  prompt_versions PromptVersion[]
+  workflows     Workflow[]
+  comments      Comment[]
+
+  @@map("workspaces")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  role       String   // "user" | "assistant"
+  content    String
+  created_at DateTime @default(now())
+
+  workspace_id String
+  workspace    Workspace @relation(fields: [workspace_id], references: [id])
+
+  user_id String
+  user    User @relation(fields: [user_id], references: [id])
+
+  @@map("messages")
+}
+
+model File {
+  id            String   @id @default(uuid())
+  filename      String
+  original_name String
+  mimetype      String
+  size          Int
+  path          String
+  s3_key        String?
+  parsed_text   String?
+  created_at    DateTime @default(now())
+
+  workspace_id String
+  workspace    Workspace @relation(fields: [workspace_id], references: [id])
+
+  user_id String
+  user    User @relation(fields: [user_id], references: [id])
+}
+
+model AIRequest {
+  id           String   @id @default(uuid())
+  prompt       String
+  response     String
+  model        String
+  latency_ms   Int
+  tokens_used  Int?
+  cost_usd     Float?
+  agent_type   String?
+  created_at   DateTime @default(now())
+
+  user_id String
+  user    User @relation(fields: [user_id], references: [id])
+
+  workspace_id String?
+  workspace    Workspace? @relation(fields: [workspace_id], references: [id])
+}
+
+model Embedding {
+  id          String   @id @default(uuid())
+  content     String
+  vector      Json
+  created_at  DateTime @default(now())
+
+  workspace_id String
+  workspace    Workspace @relation(fields: [workspace_id], references: [id])
+}
+
+model APIKey {
+  id          String   @id @default(uuid())
+  name        String
+  key_hash    String   @unique
+  last_used   DateTime?
+  created_at  DateTime @default(now())
+
+  user_id String
+  user    User @relation(fields: [user_id], references: [id])
+}
+
+model Subscription {
+  id                 String   @id @default(uuid())
+  plan               Plan     @default(FREE)
+  token_limit        Int      @default(10000)
+  tokens_used        Int      @default(0)
+  stripe_customer_id String?
+  stripe_sub_id      String?
+  current_period_end DateTime?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @default(now()) @updatedAt
+
+  user_id String @unique
+  user    User   @relation(fields: [user_id], references: [id])
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  created_at  DateTime @default(now())
+
+  members         TeamMember[]
+  team_workspaces TeamWorkspace[]
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  role      TeamRole @default(VIEWER)
+  joined_at DateTime @default(now())
+
+  user_id String
+  user    User @relation(fields: [user_id], references: [id])
+
+  team_id String
+  team    Team @relation(fields: [team_id], references: [id])
+
+  @@unique([user_id, team_id])
+}
+
+model TeamWorkspace {
+  id         String   @id @default(uuid())
+  created_at DateTime @default(now())
+
+  team_id String
+  team    Team @relation(fields: [team_id], references: [id])
+
+  workspace_id String
+  workspace    Workspace @relation(fields: [workspace_id], references: [id])
+
+  @@unique([team_id, workspace_id])
+}
+
+model PromptVersion {
+  id         String   @id @default(uuid())
+  version    Int
+  title      String
+  content    String
+  diff       String?
+  created_at DateTime @default(now())
+
+  workspace_id String
+  workspace    Workspace @relation(fields: [workspace_id], references: [id])
+
+  user_id String
+  user    User @relation(fields: [user_id], references: [id])
+
+  @@unique([workspace_id, version])
+  @@map("prompt_versions")
+}
+
+enum TeamRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+model Workflow {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  isActive     Boolean  @default(false)
+  definition   Json     // { nodes: [...], edges: [...] }
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  workspace_id String
+  workspace    Workspace @relation(fields: [workspace_id], references: [id])
+
+  user_id      String
+  user         User      @relation(fields: [user_id], references: [id])
+
+  runs         WorkflowRun[]
+
+  @@map("workflows")
+}
+
+model WorkflowRun {
+  id           String   @id @default(uuid())
+  status       String   // "SUCCESS" | "FAILED" | "RUNNING"
+  trigger      String   // "MANUAL" | "WEBHOOK" | "CRON"
+  latency_ms   Int
+  logs         Json?    // [{ step: string, status: string, output: string }]
+  created_at   DateTime @default(now())
+
+  workflow_id  String
+  workflow     Workflow @relation(fields: [workflow_id], references: [id])
+
+  @@map("workflow_runs")
+}
+
+model Comment {
+  id           String   @id @default(uuid())
+  content      String
+  created_at   DateTime @default(now())
+
+  workspace_id String
+  workspace    Workspace @relation(fields: [workspace_id], references: [id])
+
+  user_id      String
+  user         User      @relation(fields: [user_id], references: [id])
+
+  @@map("comments")
+}

@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: cognify-api
+    env: node
+    plan: free
+    rootDir: cognify-server
+    buildCommand: npm install --include=dev && npx prisma generate && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false

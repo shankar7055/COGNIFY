@@ -1,0 +1,51 @@
+services:
+
+  postgres:
+    image: postgres:16
+
+    container_name: cognify-postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: cognify
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+
+    container_name: cognify-redis
+
+    restart: always
+
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+
+    container_name: cognify-backend
+
+    restart: always
+
+    ports:
+      - "3001:3000"
+
+    depends_on:
+      - postgres
+      - redis
+
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/cognify
+      JWT_SECRET: supersecret
+      REDIS_HOST: redis
+
+volumes:
+  postgres_data:
